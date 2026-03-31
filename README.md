@@ -58,7 +58,7 @@ pipx install netexec
 ## 🚀 Installation
 
 ```bash
-git clone https://github.com/YourUsername/BigBlack-NXC.git
+git clone https://github.com/Sabastiaz/BigBlack-NXC.git
 cd BigBlack-NXC
 chmod +x nxcbb.sh
 ```
