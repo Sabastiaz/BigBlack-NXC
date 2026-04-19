@@ -3,7 +3,7 @@
 > An interactive Bash wrapper for [NetExec (nxc)](https://github.com/Pennyw0rth/NetExec) — designed to streamline credential gathering and network enumeration during red team engagements and penetration tests.
 
 ![Bash](https://img.shields.io/badge/Shell-Bash-4EAA25?style=for-the-badge&logo=gnubash&logoColor=white)
-![Version](https://img.shields.io/badge/Version-4.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-4.1-blue?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-lightgrey?style=for-the-badge)
 
@@ -36,6 +36,27 @@
 | 🔑🔐 gMSA Operations | Read gMSA passwords |
 | 🔍 Advanced LDAP | ASREPRoast, Kerberoast, ACL, GPO |
 | 🧪 Hash Checking | NTLM, NetNTLMv1, NetNTLMv2 from single or file |
+| 📝 Session Logging | Auto-save all command output to log file |
+| 📊 Auto Report | Generate `.txt` and `.html` report on exit |
+
+---
+
+## 📝 Session Logging & Auto Report
+
+Every time you run the tool, all command output is automatically saved.
+When you exit (option `0`), a full report is generated instantly.
+
+```
+reports/
+├── session_20260418_200000.log     ← raw output log
+├── report_20260418_200000.txt      ← plain text summary
+└── report_20260418_200000.html     ← dark-theme HTML report
+```
+
+The HTML report includes:
+- Session metadata (target, user, domain, time, command count)
+- Each command run with its full output
+- Organized by section (Auth, Enum, Dump, etc.)
 
 ---
 
@@ -58,7 +79,7 @@ pipx install netexec
 ## 🚀 Installation
 
 ```bash
-git clone https://github.com/Sabastiaz/BigBlack-NXC.git
+git clone https://github.com/sabastiaz/BigBlack-NXC.git
 cd BigBlack-NXC
 chmod +x nxcbb.sh
 ```
@@ -104,7 +125,7 @@ Username: administrator
 14) 🔑🔐 gMSA Operations
 15) 🔍 Advanced LDAP Queries
 16) 🧪 Hash Checking (NTLM/NetNTLM)
- 0) ❌ Exit
+ 0) ❌ Exit → Generate Report
 ```
 
 ---
@@ -123,8 +144,8 @@ Username: administrator
 Password: Password123!
 Domain: corp.local
 
-# 4. Select option 2 for Basic Enumeration
-# → Lists shares, users, RID brute force automatically
+# 4. Select options to run
+# 5. Press 0 to exit → reports auto-generated in ./reports/
 ```
 
 ---
@@ -139,8 +160,13 @@ The tool saves your last-used target and username to `~/.netexec_config` for qui
 
 ```
 BigBlack-NXC/
-├── nxcbb.sh       # Main interactive script
-└── README.md      # This file
+├── nxcbb.sh          # Main interactive script
+├── tool_review.html  # Static code analysis report
+├── reports/          # Auto-generated session reports (git ignored)
+│   ├── session_*.log
+│   ├── report_*.txt
+│   └── report_*.html
+└── README.md
 ```
 
 ---
