@@ -174,7 +174,7 @@ BigBlack-NXC/
 ## 👤 Author
 
 **Sabastiaz** — Red Team Sorcerer
-- Site: [https://sabastiaz.netlify.app/]
+- Site: (https://sabastiaz.netlify.app/)
 - GitHub: [@sabastiaz](https://github.com/sabastiaz)
 - Blog: [medium.com/@sabastiaz](https://medium.com/@sabastiaz)
 
