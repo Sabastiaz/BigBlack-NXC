@@ -142,7 +142,7 @@ Username: administrator
 # 3. Enter credentials
 Username: administrator
 Password: Password123!
-Domain: corp.local
+Domain: wowza.local
 
 # 4. Select options to run
 # 5. Press 0 to exit → reports auto-generated in ./reports/
